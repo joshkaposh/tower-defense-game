@@ -1,14 +1,46 @@
 import Vect2 from "../Vect2";
 
 export default class Enemy {
-	constructor(x, y, radius, velocity, color) {
+	#reachedDestination = false;
+	#shouldDestroy = false;
+	#decrementPlayerLives;
+
+	constructor(x, y, radius, velocity, color, decrementPlayerLivesCB) {
 		this.pos = new Vect2(x, y);
 		this.radius = radius;
 		this.velocity = velocity;
 		this.color = color;
+		this.hp = 1;
 		this.target = null;
 		this.currentPathIndex = 0;
 		this.moveDelay = 2;
+		this.#decrementPlayerLives = decrementPlayerLivesCB;
+	}
+
+	get circle() {
+		return {
+			x: this.pos.x,
+			y: this.pos.y,
+			radius: this.radius,
+		};
+	}
+
+	get shouldDestroy() {
+		return this.#shouldDestroy;
+	}
+
+	destroy() {
+		this.#shouldDestroy = true;
+		if (this.#reachedDestination) this.#decrementPlayerLives(1);
+	}
+
+	damage(dmg) {
+		if (this.hp - dmg < 1) {
+			this.destroy();
+		}
+
+		this.hp -= dmg;
+		return true;
 	}
 
 	draw(Draw) {
@@ -17,29 +49,34 @@ export default class Enemy {
 	}
 
 	getNextWaypoint(path) {
+		this.target = path[this.currentPathIndex];
+
 		if (this.currentPathIndex >= path.length - 1) {
+			// ! bug where enemy gets next
 			// reached the end
 			// decrement lives
 			// destroy enemy
+			this.#reachedDestination = true;
+			this.destroy();
+			// console.log("reached the end");
 			return;
 		}
 		this.currentPathIndex++;
-		this.target = path[this.currentPathIndex];
 	}
 
 	update(path, delta) {
-		this.target = path[this.currentPathIndex];
-		console.log(path, this.target);
-
-		// console.log(target);
-		// console.log(this.pos);
-		const dirUnit = Vect2.SubBy(this.target, this.pos).norm();
-		// console.log(dirUnit);
-		this.pos.add(new Vect2(dirUnit.x * this.velocity * delta, dirUnit.y * this.velocity * delta));
-
-		if (Vect2.distance(this.pos, this.target) < 0.2) {
+		const target = this.target.middle;
+		// console.log(target, this.pos);
+		const dU = Vect2.Norm(Vect2.Sub(target, this.pos));
+		const speed = this.velocity * delta;
+		if (Vect2.distance(this.pos, target) < 1) {
 			this.getNextWaypoint(path);
 		}
+
+		if (!this.#reachedDestination) {
+			this.pos.add(new Vect2(dU.x * speed, dU.y * speed));
+		}
+
 		// this.currentNode
 	}
 }

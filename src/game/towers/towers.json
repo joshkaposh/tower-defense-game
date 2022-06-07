@@ -1,0 +1,9 @@
+[
+    {
+        "name":"standard-tower",
+        "type":"standard",
+        "damage":1,
+        "pierce":1,
+        "cost":150
+    }
+]

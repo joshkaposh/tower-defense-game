@@ -1,3 +1,10 @@
+import { logDOM } from "@testing-library/react";
+import Tower from "./Tower";
+
+const TOWERS = {
+	standard: Tower,
+};
+
 export default class Towers {
 	#towers = [];
 
@@ -6,7 +13,6 @@ export default class Towers {
 	}
 
 	add(tower) {
-		console.log(tower);
 		this.#towers.push(tower);
 	}
 
@@ -23,10 +29,10 @@ export default class Towers {
 		}
 	}
 
-	update(Draw, mouse, delta) {
+	update(Draw, mouse, enemies, delta) {
 		for (let i = 0; i < this.#towers.length; i++) {
 			let tower = this.#towers[i];
-			tower.update(Draw, mouse, delta);
+			tower.update(Draw, enemies, delta);
 		}
 	}
 }

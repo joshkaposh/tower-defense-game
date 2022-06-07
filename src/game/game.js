@@ -8,7 +8,6 @@ import A_Star, { distance } from "./pathfinder/A_Star";
 import Drawer from "../CanvasDrawer";
 import Grid from "./Grid";
 import Enemies from "./enemies/Enemies";
-import Enemy from "./enemies/Enemy";
 import Towers from "./towers/Towers";
 import Tower from "./towers/Tower";
 
@@ -22,15 +21,37 @@ export const COLORS = {
 	HIGHLIGHT: "rgba(255,255,255,0.4)",
 };
 
+const TOWER_NAMES = {
+	standard: 0,
+};
+
+// { cost, damage, pierce, range, fireRate }
+
+const TOWERS = [
+	{
+		cost: 150,
+		dmg: 1,
+		pierce: 1,
+		range: 150,
+		fireRate: 2, // per second
+	},
+];
+
 export default class Game {
 	#tool = null;
+	#selectedTower = null;
+	#action = null;
+	#running = false;
 	#money = 500;
+	#ACTIONS = new Map();
 
 	constructor(canvas, width, height, cols, rows, tilesize) {
 		// console.log(this.#towers);
 		this.cols = cols;
 		this.rows = rows;
 		this.tilesize = tilesize;
+		this.width = width;
+		this.height = height;
 		this.mouse = new Vect2(null, null);
 		this.Draw = new Drawer(canvas.getContext("2d"));
 		this.grid = new Grid(width, height, this.cols, this.rows, tilesize);
@@ -43,8 +64,21 @@ export default class Game {
 		this.end = null;
 		this.path = null;
 		this.waveCounter = 0;
-		this.canvas.addEventListener("mousedown", this.trackMouse.bind(this));
-		this.canvas.addEventListener("mousemove", this.followMouse.bind(this));
+		this.lives = 100;
+		this.#ACTIONS.set("buy", 0);
+		this.canvas.addEventListener("mousedown", this.onMouseDown.bind(this));
+		this.canvas.addEventListener("mousemove", this.setMousePos.bind(this));
+	}
+
+	setAction(key) {
+		const validAction = this.#ACTIONS.get(key);
+		if (validAction !== null) {
+			this.#action = validAction;
+		}
+	}
+
+	setSelectedTower(value) {
+		this.#selectedTower = value;
 	}
 
 	setTool(value) {
@@ -52,13 +86,31 @@ export default class Game {
 
 		if (value === "start-game") {
 			this.startGame();
+		} else if (value === "build-path") {
+			this.buildPath();
 		}
 	}
 
+	addMoney(num) {
+		this.#money += num;
+	}
+
+	subtractLives(num) {
+		this.lives -= num;
+	}
+
 	startGame() {
+		this.#running = true;
 		this.buildPath();
-		let pos = new Vect2(this.start.x + this.tilesize / 2, this.start.y + this.tilesize / 2);
-		this.enemies.add(new Enemy(pos.x, pos.y, this.tilesize / 2, 10, "red"));
+		// this.enemies.setStart(this.start);
+		this.enemies.init(this.start, this.path, this.subtractLives.bind(this));
+		this.enemies.spawnEnemy(this.path);
+		this.enemies.startNewWave();
+		// let pos = new Vect2(this.start.x + this.tilesize / 2, this.start.y + this.tilesize / 2);
+
+		// const enemy = new Enemy(pos.x, pos.y, this.tilesize / 2, 10, "red");
+		// enemy.getNextWaypoint(this.path);
+		// this.enemies.add(enemy);
 	}
 
 	placeWall(tile) {
@@ -68,18 +120,9 @@ export default class Game {
 		tile.changeColor(COLORS.WALL);
 	}
 
-	drawPath(path) {
-		this.Draw.setFill("lightblue");
-
-		for (let i = 0; i < path.length; i++) {
-			let node = path[i];
-
-			this.Draw.drawRect(node.x, node.y, node.tilesize, node.tilesize, true);
-		}
-	}
-
 	buildPath() {
 		const path = this.pathfind.find_path(this.start, this.end);
+		path.shift();
 		this.path = path;
 		// console.log(path);
 	}
@@ -105,26 +148,47 @@ export default class Game {
 		this.end = tile;
 	}
 
-	placeTower(tile, towerCost) {
-		if (this.#money < towerCost) return;
-		this.#money -= towerCost;
+	spawnTower(tile, tower) {
+		let range = tile.tilesize * 3;
+		let fireRate = 2;
 
-		// this.buyTower();
-		const tower = new Tower(
-			this.towers.size,
-			towerCost,
-			tile.x,
-			tile.y,
-			tile.tilesize,
-			tile.tilesize,
-			tile.tilesize * 3,
-			0.33
-		);
-		tile.wall = false;
-		tile.tower = true;
-		tile.addTower(tower);
-		tile.changeColor(COLORS.TOWER);
-		this.towers.add(tower);
+		// id,
+		// 	{ cost, damage, pierce, range, fireRate },
+		// x, y,
+		// width, height,
+
+		const spawnedTower = new Tower(this.towers.size, tower, tile.x, tile.y, tile.tilesize, tile.tilesize);
+		spawnedTower.init(this.addMoney.bind(this));
+		this.towers.add(spawnedTower);
+
+		return spawnedTower;
+	}
+
+	canBuyTower(costOfTower) {
+		console.log(this.#money, costOfTower);
+		return this.#money >= costOfTower;
+	}
+
+	buyTower(costOfTower) {
+		// console.log("cost of tower: ", cost);
+		this.#money -= costOfTower;
+	}
+
+	placeTower(tile, towerType) {
+		// console.log(tile, towerType);
+		let type = TOWER_NAMES[towerType];
+		const towerInfo = TOWERS[type];
+		console.log(towerInfo);
+		if (this.canBuyTower(towerInfo.cost)) {
+			this.buyTower(towerInfo.cost);
+			const temp = this.spawnTower(tile, towerInfo);
+			tile.wall = false;
+			tile.tower = true;
+			tile.addTower(temp);
+			tile.changeColor(COLORS.TOWER);
+		} else {
+			console.log("Not Enough Funds: cost: %s, money: %s", towerInfo.cost, this.#money);
+		}
 	}
 
 	removeTower(tile, towerCost) {
@@ -139,24 +203,27 @@ export default class Game {
 		tile.highlight = true;
 	}
 
-	followMouse(e) {
+	setMousePos(e) {
 		let rect = this.canvas.getBoundingClientRect();
 		this.mouse.x = e.clientX - rect.left;
 		this.mouse.y = e.clientY - rect.top;
 	}
 
-	trackMouse(e) {
-		let rect = this.canvas.getBoundingClientRect();
-		this.mouse.x = e.clientX - rect.left;
-		this.mouse.y = e.clientY - rect.top;
-
+	onMouseDown(e) {
+		this.setMousePos(e);
 		this.interact();
-		// console.log(this.mouse);
 	}
 
 	interact() {
 		//* interacts with tiles based on tool type
 		const tile = this.grid.getTileXY(this.mouse.x, this.mouse.y);
+		if (this.#action === this.#ACTIONS.get("buy")) {
+			console.log("action: ", this.#action);
+
+			this.placeTower(tile, this.#selectedTower);
+			return;
+		}
+
 		switch (this.#tool) {
 			case "build-path":
 				console.log("hi");
@@ -167,7 +234,6 @@ export default class Game {
 				// if ()
 				break;
 			case "place-path":
-				console.log("hi");
 				this.placePath(tile);
 				break;
 			case "place-start":
@@ -181,7 +247,7 @@ export default class Game {
 				break;
 
 			case "place-tower":
-				this.placeTower(tile, 150);
+				this.placeTower(tile, this.#selectedTower, 150);
 				break;
 			case "remove-tower":
 				this.removeTower(tile, 150);
@@ -193,9 +259,21 @@ export default class Game {
 		}
 	}
 
+	drawPath(path) {
+		this.Draw.setFill("lightblue");
+
+		for (let i = 0; i < path.length; i++) {
+			let node = path[i];
+
+			this.Draw.drawRect(node.x, node.y, node.tilesize, node.tilesize, true);
+		}
+	}
+
 	renderUI() {
 		const moneyTag = document.getElementById("money");
 		moneyTag.innerText = this.#money;
+		this.Draw.setFont("20px Arial");
+		this.Draw.drawText(`Lives: ${this.lives}`, "black", 20, this.height - 20);
 	}
 
 	render() {
@@ -222,11 +300,11 @@ export default class Game {
 	update(delta) {
 		this.render();
 		// console.log(this.towers);
-		this.towers.update(this.Draw, this.mouse, delta);
-		this.enemies.update(this.path, delta);
-		// this.towers.update(this.Draw, this.mouse, delta);
-		// for (let i = 0; i < this.#towers.length; i++) {
-		// 	this.#towers[i].update(this.Draw, this.mouse, delta);
-		// }
+
+		if (this.#running) {
+			// console.log();
+			this.towers.update(this.Draw, this.mouse, this.enemies.enemies, delta);
+			this.enemies.update(delta);
+		}
 	}
 }

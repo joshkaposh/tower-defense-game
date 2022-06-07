@@ -1,5 +1,6 @@
 import collision from "./collision/collision";
 import { COLORS } from "./game";
+import Vect2 from "./Vect2";
 
 class GridNode {
 	constructor(x, y, col, row, tilesize, color) {
@@ -14,6 +15,10 @@ class GridNode {
 		this.highlight = false;
 		this.towerId = null;
 		this.neighbours = [];
+	}
+
+	get middle() {
+		return new Vect2(this.x + this.tilesize / 2, this.y + this.tilesize / 2);
 	}
 
 	equals(otherNode) {
@@ -39,7 +44,6 @@ class GridNode {
 	}
 
 	addTower(tower) {
-		console.log(tower.id);
 		this.towerId = tower.id;
 	}
 

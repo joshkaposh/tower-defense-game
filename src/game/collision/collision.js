@@ -1,9 +1,32 @@
 export default {
+	circleRect: (circle, rect) => {
+		let distX = Math.abs(circle.x - rect.x - rect.w / 2);
+		let distY = Math.abs(circle.y - rect.y - rect.h / 2);
+
+		if (distX > rect.w / 2 + circle.r) {
+			return false;
+		}
+		if (distY > rect.h / 2 + circle.r) {
+			return false;
+		}
+
+		if (distX <= rect.w / 2) {
+			return true;
+		}
+		if (distY <= rect.h / 2) {
+			return true;
+		}
+
+		let dx = distX - rect.w / 2;
+		let dy = distY - rect.h / 2;
+		return dx * dx + dy * dy <= circle.r * circle.r;
+	},
+
 	circleCircle: (c1, c2) => {
 		let dx = c1.x + c1.radius - (c2.x + c2.radius);
 		let dy = c1.y + c1.radius - (c2.y + c2.radius);
 		let distance = Math.sqrt(dx * dx + dy * dy);
-		console.log(c1, c2);
+		// console.log(c1, c2);
 
 		if (distance < c1.radius + c2.radius) {
 			return true;

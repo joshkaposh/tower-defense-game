@@ -1,10 +1,11 @@
 import React from 'react';
 import Editor from './editor/Editor';
 import Game from '../game/game'
+import Towers from './Towers'
 let game;
 
-let cols = 15;
-let rows = 15;
+let cols = 10;
+let rows = 10;
 const tilesize = 50;
 
 let gameWidth = cols * tilesize;
@@ -40,23 +41,34 @@ class Time {
 
 
 export default function Canvas() {
-    const [_, setTool] = React.useState('');
+	const [_, setTool] = React.useState('');
+	const [__, setTower] = React.useState('');
 
 	const canvasRef = React.useRef(null)
+
 
     const handleClick = (e) => {
         console.log(e.target.value);
 		setTool(e.target.value)
 		game.setTool(e.target.value);
+		game.setAction(e.target.value)
 
-    }
+		// game.setSelectedTower
+
+
+	}
+	
+	const handleTowerClick = (e) => {
+		setTower(e.target.value)
+		game.setSelectedTower(e.target.value);
+		game.setAction('buy')
+	}
 
     React.useEffect(() => {
 		const time = new Time();
-        let anId;
+		let anId;
         const animate = () => {
-
-		game.update(time.getTime())
+			game.update(time.getTime())
 			
 
             anId = requestAnimationFrame(animate)
@@ -70,6 +82,7 @@ export default function Canvas() {
 	return (<>
 		<canvas id='canvas' ref={canvasRef}></canvas>
 		<Editor  handleClick={handleClick}/>
-		</>
+		<Towers handleClick={handleTowerClick} />
+	</>
 	)
 }

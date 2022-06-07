@@ -1,17 +1,21 @@
+import collision from "../collision/collision";
 import util, { calcAtanAngle, distance } from "../util";
 import Vect2 from "../Vect2";
 
 export default class Projectile {
-	constructor(x, y, vX, vY, maxDistance, radius, target) {
+	#targetPos = null;
+	#target = null;
+	#damageEnemy = null;
+	#shouldDestroy = false;
+
+	constructor(x, y, vX, vY, maxDistance, radius, addMoney) {
 		this.pos = new Vect2(x, y);
 		this.velocity = new Vect2(vX, vY);
+		this.dmg = 1;
+		this.speed = vX;
 		this.radius = radius;
 		this.maxDistance = maxDistance;
-		this.target = target;
-		this.step = null;
-		this.startStep = null;
-		this.polar = null;
-		this.unitVect = null;
+		this.addMoney = addMoney;
 	}
 	get circle() {
 		return {
@@ -21,44 +25,61 @@ export default class Projectile {
 		};
 	}
 
+	get shouldDestroy() {
+		return this.#shouldDestroy;
+	}
+
 	draw(Draw) {
 		Draw.setFill("white");
 		Draw.drawCircle(this.pos.x, this.pos.y, this.radius, true);
 	}
 
-	setPath(start, target) {
-		const polar = util.polarFromPoint(target.x, target.y);
-		const dest = new Vect2(polar.dx, polar.dy);
-		const unitVect = Vect2.SubBy(start, dest).norm();
+	setTarget(target) {
+		// console.log(target);
+		// console.log(target.damage(0));
+		this.#damageEnemy = target.damage.bind(target);
+		this.#target = target;
+		this.#targetPos = target.pos.clone();
 
-		this.unitVect = unitVect;
-		this.polar = polar;
-		this.target = dest;
-		let r = this.velocity.x;
-		this.step = r;
-		this.startStep = r;
-
-		// const polar = util.polarFromPoint(mouse.x, mouse.y);
-		// const dest = new Vect2(polar.dx, polar.dy);
+		// this.#damageEnemy = damageEnemy;
 	}
 
-	move() {
-		const new_pos = Vect2.AddBy(this.pos, this.unitVect.multBy(-this.step));
-		// const new_pos = Vect2.AddBy(this.pos, this.unitVect);
-
-		this.pos.set(new_pos);
-
-		// let new_x = util.lerp(this.pos.x, this.pos.x + this.velocity.x, 0.2);
-		// let new_y = util.lerp(this.pos.y, this.pos.y + this.velocity.y, 0.2);
-		// const polar = util.polarFromPoint(this.target.x, this.target.y);
-		// this.pos.add()
-		// let new_x = util.cosOfX(this.step, this.polar.angle);
-		// let new_y = util.sinOfY(this.step, this.polar.angle);
-		// console.log(new_x, new_y);
-		// this.pos.add(new_x, new_y);
+	hitTarget() {
+		// console.log("hit enemy");
+		this.#shouldDestroy = true;
+		this.#damageEnemy(this.dmg);
+		this.addMoney(this.dmg);
+		// this.#damageEnemy(this.damage);
 	}
 
-	update() {
-		this.move();
+	move(delta) {}
+
+	update(delta) {
+		if (this.#target == null) {
+			// destroy bullet
+			return;
+		}
+
+		const dir = Vect2.Sub(this.#targetPos, this.pos);
+		const distanceThisFrame = this.speed * delta;
+
+		// const hit = dir.mag()
+		// if () {
+		// 	// hit target;
+		// 	this.hitTarget();
+		// 	return;
+		// }
+
+		if (dir.mag() <= distanceThisFrame || collision.circleCircle(this.circle, this.#target.circle)) {
+			this.hitTarget();
+			return;
+		}
+
+		// havent hit target, should move
+		const dirUnit = dir.norm();
+		const constantSpeed = Vect2.Mult(dirUnit, distanceThisFrame);
+		// console.log(dir, distanceThisFrame);
+		this.pos.add(constantSpeed);
+		// this.move(delta);
 	}
 }

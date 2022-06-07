@@ -1,6 +1,8 @@
 import collision from "../collision/collision";
 import Vect2 from "../Vect2";
-import util, { calcAtanAngle, distance } from "../util";
+import util from "../util";
+import Interval from "../util/Interval";
+
 import Projectile from "./Projectile";
 import { COLORS } from "../game";
 class Circle {
@@ -12,24 +14,35 @@ class Circle {
 }
 
 export default class Tower {
-	constructor(id, cost, x, y, width, height, range, shotDelay) {
+	#target;
+	#addMoney;
+	constructor(id, { cost, dmg, pierce, range, fireRate }, x, y, width, height) {
+		// this.towers.size,
+		// tower.cost,
+		// tower.damage,
+		// tower.pierce,
+		// fireRate,
+		// range,
+		// tile.x,
+		// tile.y,
+		// tile.tilesize,
+		// tile.tilesize,
+
 		this.id = id;
 		this.cost = cost;
-		this.pos = new util.Vect2(x, y);
+		this.dmg = dmg;
+		this.pierce = pierce;
+		this.pos = new Vect2(x, y);
 		this.width = width;
 		this.height = height;
 		this.range = range;
+		this.fireRate = fireRate;
+
 		this.projectiles = [];
-		this.shot_delay = shotDelay;
-		this.projectile_velocity = 15;
-		this.last_shot = 0;
+		this.shootInterval = new Interval(this.shoot.bind(this), fireRate, 0);
 		this.maxProjectileRange = Math.floor(this.range * 1.5);
 		this.color = COLORS.TOWER;
 		this.highlight = false;
-	}
-
-	get canShoot() {
-		return this.last_shot >= this.shot_delay;
 	}
 
 	get circle() {
@@ -40,33 +53,61 @@ export default class Tower {
 		};
 	}
 
-	drawPathToCircle(Draw, mouse) {
-		// let angle =
-		const polar = util.polarFromPoint(mouse.x, mouse.y);
-		const dest = new Vect2(polar.dx, polar.dy);
+	get rect() {
+		return {
+			x: this.pos.x,
+			y: this.pos.y,
+			width: this.width,
+			height: this.height,
+		};
+	}
 
-		const vect = Vect2.SubBy(this.pos, dest);
+	get middle() {
+		return new Vect2(this.pos.x + this.width / 2, this.pos.y + this.height / 2);
+	}
 
-		const new_pos = Vect2.AddBy(this.pos, vect.norm().mult(-25));
+	init(addMoney) {
+		this.#addMoney = addMoney;
+	}
 
-		Draw.setWeight(4);
+	isWithinRange(enemy, dist) {
+		return enemy !== null && dist <= this.range;
+	}
 
-		Draw.setStroke("white");
-		Draw.drawLine(this.pos, dest);
-		Draw.setWeight(6);
+	getClosestEnemy(enemies) {
+		if (enemies.length !== 0) {
+			let closestEnemy = null;
+			let closestDist = Infinity;
 
-		Draw.setStroke("red");
-		Draw.drawLine(this.pos, new_pos);
+			for (let i = 0; i < enemies.length; i++) {
+				const enemy = enemies[i];
+				// console.log(enemy);
+				const distToEnemy = Vect2.distance(this.circle, enemy.pos);
+				// console.log(distToEnemy);
+
+				if (distToEnemy < closestDist) {
+					closestDist = distToEnemy;
+					closestEnemy = enemy;
+				}
+			}
+
+			// console.log(closestEnemy);
+			// console.log(this.isWithinRange(closestEnemy, closestDist));
+			if (this.isWithinRange(closestEnemy, closestDist)) {
+				return closestEnemy;
+			} else {
+				return null;
+			}
+		}
 	}
 
 	outOfBounds(projectile) {
-		// let c1 = new Circle(projectile.pos.x, projectile.pos.y, projectile.radius);
-		let c2 = new Circle(
+		let c = new Circle(
 			Math.floor(this.pos.x + this.width / 2),
 			Math.floor(this.pos.y + this.height / 2),
 			this.maxProjectileRange
 		);
-		if (!collision.pointCircle(projectile.pos, c2)) {
+		if (!collision.pointCircle(projectile.pos, c)) {
 			return true;
 		}
 	}
@@ -82,20 +123,34 @@ export default class Tower {
 
 	drawHighlightedRange(Draw, mouse) {
 		const rect = { x: this.pos.x, y: this.pos.y, width: this.width, height: this.height };
-		// const circle = { x: this.pos.x, y: this.pos.y, radius: this.range };
 		if (collision.pointRect(mouse, rect) || (this.highlight && collision.pointCircle(mouse, this.circle))) {
 			// mouse is hovered over tower
 			this.highlight = true;
-			const center = {
-				x: this.pos.x + this.width / 2,
-				y: this.pos.y + this.height / 2,
-			};
+
 			Draw.setFill(COLORS.HIGHLIGHT);
 
-			Draw.drawCircle(center.x, center.y, this.range, true);
+			Draw.drawCircle(this.middle.x, this.middle.y, this.range, true);
 		} else {
 			this.highlight = false;
 		}
+	}
+
+	drawPathToTarget(Draw, target) {
+		if (target == null) return;
+		const polar = util.polarFromPoint(target.pos.x, target.pos.y);
+		const dest = new Vect2(polar.dx, polar.dy);
+		const vect = Vect2.Sub(this.middle, dest);
+
+		const new_pos = Vect2.Add(this.middle, vect.norm().mult(-25));
+
+		Draw.setWeight(4);
+
+		Draw.setStroke("white");
+		Draw.drawLine(this.middle, dest);
+
+		Draw.setStroke("red");
+		Draw.drawLine(this.middle, new_pos);
+		Draw.setWeight(1);
 	}
 
 	draw(Draw, mouse) {
@@ -103,27 +158,44 @@ export default class Tower {
 		Draw.drawRect(this.pos.x, this.pos.y, this.width, this.height, true);
 		this.drawHighlightedRange(Draw, mouse);
 		this.drawRange(Draw);
-		this.drawPathToCircle(Draw, mouse);
+		this.drawPathToTarget(Draw, this.#target);
 	}
 
-	shoot(mouse) {
-		if (this.projectiles.length > 1) {
-			return;
-		}
-		const angle = calcAtanAngle(mouse.y, mouse.x);
-		let x = Math.cos(angle);
-		let y = Math.sin(angle);
+	shoot() {
+		const projectile = new Projectile(
+			this.middle.x,
+			this.middle.y,
+			60,
+			60,
+			this.maxProjectileRange,
+			10,
+			this.#addMoney
+		);
+		projectile.setTarget(this.#target);
 
-		const projectile = new Projectile(this.circle.x, this.circle.y, 5, 5, this.maxProjectileRange, 10, mouse);
-
-		projectile.setPath(this.pos, mouse);
 		this.projectiles.push(projectile);
 	}
 
-	updateProjectiles(Draw) {
+	destroyProjectile(index) {
+		// if (index > -1 && index <= this.size - 1) {
+		// console.log(index);
+		this.projectiles.splice(index, 1);
+		// }
+	}
+
+	destroyMarkedProjectiles() {
+		for (let i = this.projectiles.length - 1; i >= 0; i--) {
+			if (this.projectiles[i].shouldDestroy) {
+				// console.log("destroying projectile");
+				this.destroyProjectile(i);
+			}
+		}
+	}
+
+	updateProjectiles(Draw, delta) {
 		if (this.projectiles.length === 0) return;
 		for (let i = this.projectiles.length - 1; i >= 0; i--) {
-			this.projectiles[i].update();
+			this.projectiles[i].update(delta);
 			this.projectiles[i].draw(Draw);
 
 			if (this.outOfBounds(this.projectiles[i], i)) {
@@ -132,14 +204,16 @@ export default class Tower {
 		}
 	}
 
-	update(Draw, mouse, delta) {
-		if (collision.pointCircle(mouse, this.circle) && this.canShoot) {
-			this.shoot(mouse);
-			// console.log(delta);
-			this.last_shot = delta;
-		} else {
-			this.last_shot += delta;
+	update(Draw, enemies, delta) {
+		this.#target = this.getClosestEnemy(enemies);
+
+		if (this.#target == null) {
+			return;
 		}
-		this.updateProjectiles(Draw);
+
+		this.shootInterval.step(this.#target, delta);
+
+		this.updateProjectiles(Draw, delta);
+		this.destroyMarkedProjectiles();
 	}
 }

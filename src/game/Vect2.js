@@ -16,6 +16,13 @@ export default class Vect2 {
 		}
 	}
 
+	static Norm(vect) {
+		let m = Vect2.Mag(vect);
+		if (m > 0) {
+			return Vect2.Div(vect, m);
+		}
+	}
+
 	static distance(v, w) {
 		return Math.sqrt(Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2));
 	}
@@ -24,21 +31,29 @@ export default class Vect2 {
 		return Math.sqrt(vect.x * vect.x + vect.y * vect.y);
 	}
 
-	static AddBy(vect1, vect2) {
+	static Add(vect1, vect2) {
 		return new Vect2(vect1.x + vect2.x, vect1.y + vect2.y);
 	}
 
-	addBy(vect) {
-		return new Vect2(this.x + vect.x, this.y + vect.y);
-	}
-
-	static SubBy(vect1, vect2) {
+	static Sub(vect1, vect2) {
 		return new Vect2(vect1.x - vect2.x, vect1.y - vect2.y);
 	}
 
-	subBy(vect) {
-		return new Vect2(this.x - vect.x, this.y - vect.y);
+	static Mult(vect, scalar) {
+		return new Vect2(vect.x * scalar, vect.y * scalar);
 	}
+
+	static Div(vect, scalar) {
+		return new Vect2(vect.x / scalar, vect.y / scalar);
+	}
+
+	// addBy(vect) {
+	// 	return new Vect2(this.x + vect.x, this.y + vect.y);
+	// }
+
+	// subBy(vect) {
+	// 	return new Vect2(this.x - vect.x, this.y - vect.y);
+	// }
 
 	add(vect) {
 		this.x += vect.x;
@@ -72,18 +87,19 @@ export default class Vect2 {
 		this.y -= vect.y;
 	}
 
+	Div(vect, scalar) {
+		return new Vect2((vect.x /= scalar), (vect.y /= scalar));
+	}
+
 	div(scalar) {
 		this.x /= scalar;
 		this.y /= scalar;
 		return this;
 	}
-	divBy(vect, scalar) {
-		return new Vect2(vect.x / scalar, vect.y / scalar);
-	}
 
-	multBy(scalar) {
-		return new Vect2(this.x * scalar, this.y * scalar);
-	}
+	// multBy(scalar) {
+	// 	return new Vect2(this.x * scalar, this.y * scalar);
+	// }
 	mult(scalar) {
 		this.x *= scalar;
 		this.y *= scalar;
